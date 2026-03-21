@@ -25,7 +25,7 @@ import { JobData, LogEntry } from './types';
 import jobsDataRaw from './jobs_data.json';
 
 const jobsData = jobsDataRaw as JobData[];
-const DEFAULT_PLOT_LIMIT = 200;
+const DEFAULT_PLOT_LIMIT = 200; //
 let defaultRandomJobsCache: JobData[] | null = null;
 const minSalary = Math.min(...jobsData.map(job => job.Median_Salary_USD));
 const maxSalary = Math.max(...jobsData.map(job => job.Median_Salary_USD));
