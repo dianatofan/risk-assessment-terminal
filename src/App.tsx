@@ -922,6 +922,76 @@ function RiskMatrix({ matches, selectedJob, onSelectJob, isScanning }: {
         .attr('stroke', '#39FF14')
         .attr('stroke-width', 2)
         .attr('filter', 'drop-shadow(0 0 8px rgba(57, 255, 20, 0.8))');
+
+      // Tooltip
+      const label = selectedJob.Job_Title.toUpperCase();
+      const padX = 9;
+      const padY = 5;
+      const tooltipH = 22;
+      const arrowSize = 5;
+      const gap = 6; // gap between selection box edge and tooltip
+
+      // Measure text width with a temporary off-screen text node
+      const probe = selectionGroup.append('text')
+        .attr('font-size', '9')
+        .attr('font-family', 'Space Grotesk, monospace')
+        .attr('font-weight', '700')
+        .attr('letter-spacing', '1')
+        .attr('visibility', 'hidden')
+        .text(label);
+      const textW = (probe.node() as SVGTextElement)?.getBBox()?.width ?? label.length * 6.5;
+      probe.remove();
+
+      const tooltipW = textW + padX * 2;
+
+      // Position: above by default, below if near the top
+      const wouldClipTop = sy - 15 - gap - arrowSize - tooltipH < margin.top;
+      const tooltipY = wouldClipTop
+        ? sy + 15 + gap + arrowSize          // below the box
+        : sy - 15 - gap - arrowSize - tooltipH; // above the box
+
+      // Clamp horizontally so it never goes off the edges
+      let tooltipX = sx - tooltipW / 2;
+      tooltipX = Math.max(margin.left, Math.min(tooltipX, width - margin.right - tooltipW));
+
+      // Arrow tip X (always points to the node, respects clamp)
+      const arrowTipX = Math.max(tooltipX + 8, Math.min(sx, tooltipX + tooltipW - 8));
+
+      // Background
+      selectionGroup.append('rect')
+        .attr('x', tooltipX)
+        .attr('y', tooltipY)
+        .attr('width', tooltipW)
+        .attr('height', tooltipH)
+        .attr('fill', '#1C1B1B')
+        .attr('stroke', '#39FF14')
+        .attr('stroke-width', 1)
+        .attr('stroke-opacity', 0.5)
+        .attr('filter', 'drop-shadow(0 0 8px rgba(57, 255, 20, 0.25))');
+
+      // Arrow (triangle pointing toward the node)
+      const arrowPoints = wouldClipTop
+        ? `${arrowTipX},${tooltipY - arrowSize} ${arrowTipX - arrowSize},${tooltipY} ${arrowTipX + arrowSize},${tooltipY}`
+        : `${arrowTipX},${tooltipY + tooltipH + arrowSize} ${arrowTipX - arrowSize},${tooltipY + tooltipH} ${arrowTipX + arrowSize},${tooltipY + tooltipH}`;
+
+      selectionGroup.append('polygon')
+        .attr('points', arrowPoints)
+        .attr('fill', '#1C1B1B')
+        .attr('stroke', '#39FF14')
+        .attr('stroke-width', 1)
+        .attr('stroke-opacity', 0.5)
+        .attr('stroke-linejoin', 'round');
+
+      // Label text
+      selectionGroup.append('text')
+        .attr('x', tooltipX + padX)
+        .attr('y', tooltipY + padY + 10)
+        .attr('font-size', '9')
+        .attr('font-family', 'Space Grotesk, monospace')
+        .attr('font-weight', '700')
+        .attr('letter-spacing', '1')
+        .attr('fill', '#39FF14')
+        .text(label);
     }
 
   }, [matches, selectedJob, isScanning, dimensions]);
