@@ -530,7 +530,10 @@ export default function App() {
                 <div className="space-y-6">
                   <div>
                     <div className="flex justify-between text-[10px] mb-1 font-bold text-on-surface-variant uppercase">
-                      Survival Probability
+                      <span className="flex items-center">
+                        Survival Probability
+                        <InfoTooltip text="Estimated probability that the job will NOT be automated by 2030. Higher = safer." />
+                      </span>
                       <span>{(100 - selectedJob.Automation_Risk_Percent).toFixed(1)}%</span>
                     </div>
                     <div className="h-4 bg-surface-container-highest w-full relative">
@@ -544,7 +547,10 @@ export default function App() {
 
                   <div>
                     <div className="flex justify-between text-[10px] mb-1 font-bold text-on-surface-variant uppercase">
-                      Automation Risk
+                      <span className="flex items-center">
+                        Automation Risk
+                        <InfoTooltip text="Estimated probability that the job will be automated by 2030. Higher = more at risk." />
+                      </span>
                       <span>{selectedJob.Automation_Risk_Percent.toFixed(1)}%</span>
                     </div>
                     <div className="h-4 bg-surface-container-highest w-full relative">
@@ -781,6 +787,18 @@ export default function App() {
         </motion.div>
       )}
     </div>
+  );
+}
+
+function InfoTooltip({ text }: { text: string }) {
+  return (
+    <span className="relative group inline-flex items-center ml-1">
+      <Info className="w-3 h-3 text-on-surface-variant/50 cursor-help group-hover:text-primary-container transition-colors" />
+      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 px-3 py-2 bg-surface-container-highest border border-outline-variant/40 text-[9px] font-mono text-on-surface-variant normal-case tracking-normal leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-50 shadow-lg whitespace-normal">
+        {text}
+        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-outline-variant/40" />
+      </span>
+    </span>
   );
 }
 
