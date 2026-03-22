@@ -59,15 +59,46 @@ const getStableJitter = (seed: string, magnitude = 0.012) => {
   for (let i = 0; i < seed.length; i++) {
     hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
   }
-  return ((hash / 0xffffffff) - 0.5) * 2 * magnitude;
+  // Use two rounds to get independent x/y jitter from the same seed
+  let hash2 = hash;
+  for (let i = seed.length - 1; i >= 0; i--) {
+    hash2 = (hash2 * 37 + seed.charCodeAt(i) + 1) >>> 0;
+  }
+  return ((hash2 / 0xffffffff) - 0.5) * 2 * magnitude;
 };
 
-const getPlotX = (job: JobData) => {
-  return clampUnit(getAutomationRiskRatio(job) + getStableJitter(`${job.Job_Title}-x`, 0.01));
+// Deterministic hash helper used for two independent jitter values
+const getHash = (seed: string): number => {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  return hash / 0xffffffff; // 0..1
 };
 
-const getPlotY = (job: JobData) => {
-  return clampUnit(getMedianSalaryRatio(job) + getStableJitter(`${job.Job_Title}-y`, 0.014));
+// X axis: AI Exposure Index derived from AI_Impact_Level category
+// Low → ~0.2, Moderate → ~0.5, High → ~0.8, with large deterministic jitter so
+// each category forms a visible "cloud" rather than a single vertical line.
+const getAiExposureBase = (job: JobData): number => {
+  switch (job.AI_Impact_Level) {
+    case 'Low':      return 0.18;
+    case 'Moderate': return 0.5;
+    case 'High':     return 0.82;
+    default:         return 0.5;
+  }
+};
+
+const getPlotX = (job: JobData): number => {
+  // Spread within ±0.13 of the category center deterministically
+  const jitter = (getHash(`${job.Job_Title}-ax`) - 0.5) * 2 * 0.13;
+  return clampUnit(getAiExposureBase(job) + jitter);
+};
+
+const getPlotY = (job: JobData): number => {
+  // Y = survival probability (high survival → top of chart)
+  const survival = getSurvivalProbability(job);
+  const jitter = (getHash(`${job.Job_Title}-sy`) - 0.5) * 2 * 0.025;
+  return clampUnit(survival + jitter);
 };
 
 const getSurvivalProbability = (job: JobData) => {
@@ -780,7 +811,7 @@ function RiskMatrix({ matches, selectedJob, onSelectJob, isScanning }: {
     if (!svgRef.current || dimensions.width === 0 || dimensions.height === 0) return;
 
     const { width, height } = dimensions;
-    const margin = { top: 100, right: 60, bottom: 40, left: 60 };
+    const margin = { top: 20, right: 30, bottom: 20, left: 30 };
 
     const svg = d3.select(svgRef.current);
     
