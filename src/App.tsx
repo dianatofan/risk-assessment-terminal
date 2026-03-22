@@ -563,8 +563,8 @@ export default function App() {
                   <Search className="w-4 h-4" />
                   JOB_THREAT_LEVEL
                 </div>
-                <h2 className="text-2xl font-black mb-6 crt-glow uppercase text-primary-container leading-tight">
-                  {selectedJob.Job_Title.replace(' ', '_')}
+                <h2 className="text-xl sm:text-2xl font-black mb-6 crt-glow uppercase text-primary-container leading-tight break-words [overflow-wrap:anywhere]">
+                  {selectedJob.Job_Title}
                 </h2>
                 
                 <div className="space-y-6">
@@ -672,7 +672,7 @@ export default function App() {
 
             {/* System Status Card */}
             {selectedJob && (
-              <div className="bg-surface-container p-4 border border-outline-variant/30 flex-grow">
+              <div className="bg-surface-container p-4 border border-outline-variant/30 flex-none lg:flex-grow min-h-0">
                 <div className="text-[10px] font-black mb-4 flex items-center gap-2 text-on-surface-variant uppercase">
                   <span className={`w-2 h-2 rounded-full animate-ping ${
                     selectedJob.status === 'SECURE' ? 'bg-primary-container' : 
