@@ -501,7 +501,7 @@ export default function App() {
 
         <div className="flex flex-col lg:grid lg:grid-cols-12 gap-4 lg:gap-6 lg:flex-1 lg:overflow-hidden lg:min-h-0 flex-1">
           {/* Risk Matrix (Scatterplot) */}
-          <div className="col-span-12 lg:col-span-8 w-full lg:flex-1 lg:min-h-0 flex-1 bg-surface-container flex flex-col relative overflow-hidden border border-outline-variant/20">
+          <div className="col-span-12 lg:col-span-8 w-full min-h-[100dvh] lg:flex-1 lg:min-h-0 flex-1 bg-surface-container flex flex-col relative overflow-hidden border border-outline-variant/20">
             <div className="p-4 bg-surface-container-high flex justify-between items-center border-b border-outline-variant/20">
               <span className="text-xs font-black tracking-tighter text-on-surface-variant uppercase">THREAT_VISUALIZATION_V2.04</span>
               <div className="flex gap-2 items-center">
@@ -553,7 +553,7 @@ export default function App() {
           </div>
 
           {/* Right Sidebar Panels */}
-          <aside className="col-span-12 lg:col-span-4 w-full lg:flex-1 lg:min-h-0 flex-1 flex flex-col gap-6 overflow-y-auto pr-2 custom-scrollbar">
+          <aside className="col-span-12 lg:col-span-4 w-full min-h-[100dvh] lg:flex-1 lg:min-h-0 flex-1 flex flex-col gap-6 overflow-visible lg:overflow-y-auto pr-2 custom-scrollbar">
             {/* Role Inspector */}
             {selectedJob ? (
               <div 
@@ -752,15 +752,15 @@ export default function App() {
         </div>
 
         {/* System Logs Footer */}
-        <footer className="bg-surface-container-low p-4 border-t-2 border-outline-variant/40 font-mono text-[11px] overflow-hidden shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] h-[214px] flex-shrink-0 flex flex-col">
+        <footer className="bg-surface-container-low p-4 border-t-2 border-outline-variant/40 font-mono text-[11px] overflow-visible lg:overflow-hidden shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] h-auto lg:h-[214px] flex-shrink-0 flex flex-col">
           <div className="flex justify-between items-center mb-2 px-2 border-b border-outline-variant/20 pb-1">
             <span className="text-primary-container font-black uppercase tracking-widest flex items-center gap-2">
               <Terminal className="w-3 h-3" />
               &gt;&gt; SYSTEM_LOGS_STREAM
             </span>
-            <span className="text-on-surface-variant uppercase text-[9px]">ID: 0x9928AF_B // LAST_SEEN_SUNLIGHT: 2029-05-12</span>
+            <span className="hidden lg:block text-on-surface-variant uppercase text-[9px]">ID: 0x9928AF_B // LAST_SEEN_SUNLIGHT: 2029-05-12</span>
           </div>
-          <div className="space-y-1 flex-1 min-h-0 overflow-y-auto text-on-surface-variant font-medium custom-scrollbar pr-2">
+          <div className="space-y-1 flex-none lg:flex-1 min-h-0 overflow-visible lg:overflow-y-auto text-on-surface-variant font-medium custom-scrollbar pr-2">
             {logs.map((log, i) => (
               <div key={i} className="flex gap-4 hover:bg-white/5 transition-colors">
                 <span className="text-outline-variant">[{log.timestamp}]</span>
