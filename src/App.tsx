@@ -18,14 +18,20 @@ import {
   AlertTriangle,
   CheckCircle2,
   Info,
+  Briefcase,
+  TrendingUp,
+  Laptop,
+  Users,
+  ExternalLink,
   XCircle,
   Download
 } from 'lucide-react';
 import { JobData, LogEntry } from './types';
-import jobsDataRaw from './jobs_data.json';
+import jobsDataRaw from './ai_job_trends_no_truncation.json';
 
 const jobsData = jobsDataRaw as JobData[];
-const DEFAULT_PLOT_LIMIT = 200; //
+const DEFAULT_PLOT_LIMIT = 500;
+const SEARCH_DEBOUNCE_MS = 320;
 let defaultRandomJobsCache: JobData[] | null = null;
 const minSalary = Math.min(...jobsData.map(job => job.Median_Salary_USD));
 const maxSalary = Math.max(...jobsData.map(job => job.Median_Salary_USD));
@@ -105,6 +111,20 @@ const getSurvivalProbability = (job: JobData) => {
   return 1 - getAutomationRiskRatio(job);
 };
 
+const formatAiTakeoverResponse = (value: string) => {
+  const normalized = value
+    .replace(/[_|]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!normalized) return '';
+
+  return normalized
+    .toLowerCase()
+    .replace(/\bai\b/g, 'AI')
+    .replace(/(^\w|[.!?]\s+\w)/g, match => match.toUpperCase());
+};
+
 const SYSTEM_LOGS_INITIAL: LogEntry[] = [
   { timestamp: '14:22:01', level: 'ERROR', message: 'CAFFEINE_RESERVES_CRITICAL - PERFORMANCE DEGRADATION IMMINENT' },
   { timestamp: '14:22:03', level: 'INFO', message: 'CLOUD_STORAGE_NOW_ACTUAL_CLOUDS - PRECIPITATION EXPECTED IN SERVER ROOM' },
@@ -119,6 +139,7 @@ let hasBootedOnce = false;
 
 export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [selectedJob, setSelectedJob] = useState<JobData | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [isPoweredOn, setIsPoweredOn] = useState(false);
@@ -128,7 +149,6 @@ export default function App() {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingMessage, setLoadingMessage] = useState('INITIALIZING_DOOM_SEQUENCE...');
   const [logs, setLogs] = useState<LogEntry[]>(SYSTEM_LOGS_INITIAL);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isManualScanRef = useRef(false);
 
   const LOADING_MESSAGES = [
@@ -174,30 +194,30 @@ export default function App() {
   }, [isLoading]);
 
   useEffect(() => {
-    if (searchTerm.length > 0 && !isManualScanRef.current) {
-      setIsScanning(true);
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      
-      typingTimeoutRef.current = setTimeout(() => {
-        if (!isManualScanRef.current) {
-          setIsScanning(false);
-        }
-      }, 1000);
-    } else if (searchTerm.length === 0 && !isManualScanRef.current) {
-      setIsScanning(false);
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    }
-    
-    return () => {
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    };
+    const timeout = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => clearTimeout(timeout);
   }, [searchTerm]);
+
+  useEffect(() => {
+    if (isManualScanRef.current) return;
+
+    if (searchTerm.length === 0) {
+      setIsScanning(false);
+      return;
+    }
+
+    // Show scanning only while user is still typing (before debounce settles)
+    setIsScanning(searchTerm !== debouncedSearchTerm);
+  }, [searchTerm, debouncedSearchTerm]);
 
   const searchMatches = useMemo(() => {
     return jobsData.filter(job => {
-      return job.Job_Title.toLowerCase().includes(searchTerm.toLowerCase());
+      return job.Job_Title.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
     });
-  }, [searchTerm]);
+  }, [debouncedSearchTerm]);
 
   const defaultRandomJobs = useMemo(() => getDefaultRandomJobs(), []);
 
@@ -210,9 +230,9 @@ export default function App() {
       };
 
   const visibleJobs = useMemo(() => {
-    if (searchTerm.trim().length > 0) return searchMatches;
+    if (debouncedSearchTerm.trim().length > 0) return searchMatches;
     return defaultRandomJobs;
-  }, [searchTerm, searchMatches, defaultRandomJobs]);
+  }, [debouncedSearchTerm, searchMatches, defaultRandomJobs]);
 
       const sortedVisibleJobs = useMemo(() => {
         return sortJobsBySurvivalProbability(visibleJobs);
@@ -221,40 +241,49 @@ export default function App() {
   // Keyboard Navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!selectedJob || sortedVisibleJobs.length <= 1) return;
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+      const isArrowKey = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key);
+      if (!isArrowKey || sortedVisibleJobs.length === 0) return;
+
+      // If current selection vanished after filtering, re-anchor to first visible node.
+      if (!selectedJob || !sortedVisibleJobs.some(j => j.Job_Title === selectedJob.Job_Title)) {
         e.preventDefault();
-        
-        const currentX = getPlotX(selectedJob);
-        const currentY = getPlotY(selectedJob);
+        setSelectedJob(sortedVisibleJobs[0]);
+        return;
+      }
 
-        let candidates = sortedVisibleJobs.filter(j => j.Job_Title !== selectedJob.Job_Title);
-        
-        if (e.key === 'ArrowRight') {
-          candidates = candidates.filter(j => getPlotX(j) > currentX);
-        } else if (e.key === 'ArrowLeft') {
-          candidates = candidates.filter(j => getPlotX(j) < currentX);
-        } else if (e.key === 'ArrowUp') {
-          candidates = candidates.filter(j => getPlotY(j) > currentY);
-        } else if (e.key === 'ArrowDown') {
-          candidates = candidates.filter(j => getPlotY(j) < currentY);
-        }
+      if (sortedVisibleJobs.length <= 1) return;
 
-        if (candidates.length > 0) {
-          // Find nearest candidate
-          const nearest = candidates.reduce((prev, curr) => {
-            const prevX = getPlotX(prev);
-            const prevY = getPlotY(prev);
-            const currX = getPlotX(curr);
-            const currY = getPlotY(curr);
-            
-            const distPrev = Math.sqrt(Math.pow(prevX - currentX, 2) + Math.pow(prevY - currentY, 2));
-            const distCurr = Math.sqrt(Math.pow(currX - currentX, 2) + Math.pow(currY - currentY, 2));
-            
-            return distCurr < distPrev ? curr : prev;
-          });
-          setSelectedJob(nearest);
-        }
+      e.preventDefault();
+
+      const currentX = getPlotX(selectedJob);
+      const currentY = getPlotY(selectedJob);
+
+      let candidates = sortedVisibleJobs.filter(j => j.Job_Title !== selectedJob.Job_Title);
+      
+      if (e.key === 'ArrowRight') {
+        candidates = candidates.filter(j => getPlotX(j) > currentX);
+      } else if (e.key === 'ArrowLeft') {
+        candidates = candidates.filter(j => getPlotX(j) < currentX);
+      } else if (e.key === 'ArrowUp') {
+        candidates = candidates.filter(j => getPlotY(j) > currentY);
+      } else if (e.key === 'ArrowDown') {
+        candidates = candidates.filter(j => getPlotY(j) < currentY);
+      }
+
+      if (candidates.length > 0) {
+        // Find nearest candidate
+        const nearest = candidates.reduce((prev, curr) => {
+          const prevX = getPlotX(prev);
+          const prevY = getPlotY(prev);
+          const currX = getPlotX(curr);
+          const currY = getPlotY(curr);
+          
+          const distPrev = Math.sqrt(Math.pow(prevX - currentX, 2) + Math.pow(prevY - currentY, 2));
+          const distCurr = Math.sqrt(Math.pow(currX - currentX, 2) + Math.pow(currY - currentY, 2));
+          
+          return distCurr < distPrev ? curr : prev;
+        });
+        setSelectedJob(nearest);
       }
     };
 
@@ -264,17 +293,17 @@ export default function App() {
 
   // Auto-select first match while typing
   useEffect(() => {
-    if (searchTerm && searchMatches.length > 0) {
+    if (debouncedSearchTerm && searchMatches.length > 0) {
       if (!selectedJob || !searchMatches.find(j => j.Job_Title === selectedJob.Job_Title)) {
         setSelectedJob(searchMatches[0]);
       }
-    } else if (searchTerm && searchMatches.length === 0) {
+    } else if (debouncedSearchTerm && searchMatches.length === 0) {
       setSelectedJob(null);
-    } else if (!searchTerm && selectedJob && !sortedVisibleJobs.find(j => j.Job_Title === selectedJob.Job_Title)) {
+    } else if (!debouncedSearchTerm && selectedJob && !sortedVisibleJobs.find(j => j.Job_Title === selectedJob.Job_Title)) {
       setSelectedJob(null);
     }
-    // If searchTerm is empty, we don't auto-select anything to allow the initial empty state
-  }, [searchTerm, searchMatches, sortedVisibleJobs, selectedJob]);
+    // If debouncedSearchTerm is empty, we don't auto-select anything to allow the initial empty state
+  }, [debouncedSearchTerm, searchMatches, sortedVisibleJobs, selectedJob]);
 
   const addLog = (level: LogEntry['level'], message: string) => {
     const now = new Date();
@@ -283,6 +312,7 @@ export default function App() {
   };
 
   const handleInitiateScan = () => {
+    setDebouncedSearchTerm(searchTerm);
     setIsScanning(true);
     isManualScanRef.current = true;
     addLog('INFO', `INITIATING_GLOBAL_SCAN_FOR: ${searchTerm || 'ALL_ROLES'}`);
@@ -388,8 +418,18 @@ export default function App() {
             &gt; HUMAN_REDUNDANCY_TERMINAL
           </div>
           <div className="h-4 w-[1px] bg-outline-variant/30 ml-2" />
-          <div className="text-on-surface-variant text-[10px] font-bold uppercase tracking-widest hidden md:block">
-            OPERATOR: DIANAT
+          <div className="hidden md:flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest">
+            <span className="text-on-surface-variant">SOURCE: KAGGLE // PROPHECY_OF_OBSOLESCENCE</span>
+            <a
+              href="https://www.kaggle.com/datasets/sahilislam007/ai-impact-on-job-market-20242030"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-on-surface-variant/60 hover:text-primary-container transition-colors border border-outline-variant/20 px-2 py-0.5"
+              title="OPEN_KAGGLE_DATASET"
+            >
+              <span>DATASET</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
           </div>
         </div>
         <div className="flex items-center gap-6">
@@ -576,10 +616,10 @@ export default function App() {
                     <div className="bg-surface-container-low p-4 border border-outline-variant/30">
                       <div className="text-[10px] text-primary-container font-black mb-2 uppercase flex items-center">
                         <Gavel className="w-3 h-3 mr-1" />
-                        Terminal Verdict
+                        Will AI take my job?
                       </div>
-                      <p className="text-sm leading-relaxed text-on-surface-variant font-medium uppercase">
-                        {selectedJob.ai_takeover_response}
+                      <p className="text-sm leading-relaxed text-on-surface-variant font-medium">
+                        {formatAiTakeoverResponse(selectedJob.ai_takeover_response)}
                       </p>
                     </div>
                   </div>
@@ -663,26 +703,46 @@ export default function App() {
                     </div>
                   </div>
                   <div className="w-1/2 flex flex-col justify-between">
-                    <div className="text-[8px] font-mono leading-tight text-on-surface-variant space-y-1">
-                      <div className="flex justify-between border-b border-outline-variant/10 pb-1">
-                        <span>OPENINGS_24:</span> 
-                        <span className="text-primary-container font-bold">{selectedJob.Job_Openings_2024}</span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="bg-surface-container-low border border-outline-variant/20 p-2.5 flex flex-col gap-1">
+                        <div className="flex items-center gap-1.5 text-[8px] font-black text-on-surface-variant uppercase tracking-widest">
+                          <Briefcase className="w-3 h-3 text-primary-container" />
+                          OPENINGS_24
+                        </div>
+                        <div className="text-sm font-black text-primary-container tabular-nums">
+                          {selectedJob.Job_Openings_2024.toLocaleString()}
+                        </div>
                       </div>
-                      <div className="flex justify-between border-b border-outline-variant/10 pb-1">
-                        <span>PROJ_2030:</span> 
-                        <span className="text-primary-container font-bold">{selectedJob.Projected_Openings_2030}</span>
+
+                      <div className="bg-surface-container-low border border-outline-variant/20 p-2.5 flex flex-col gap-1">
+                        <div className="flex items-center gap-1.5 text-[8px] font-black text-on-surface-variant uppercase tracking-widest">
+                          <TrendingUp className="w-3 h-3 text-primary-container" />
+                          PROJ_2030
+                        </div>
+                        <div className="text-sm font-black text-primary-container tabular-nums">
+                          {selectedJob.Projected_Openings_2030.toLocaleString()}
+                        </div>
                       </div>
-                      <div className="flex justify-between border-b border-outline-variant/10 pb-1">
-                        <span>REMOTE_RATIO:</span> 
-                        <span className="text-primary-container font-bold">{selectedJob.Remote_Work_Ratio_Percent}%</span>
+
+                      <div className="bg-surface-container-low border border-outline-variant/20 p-2.5 flex flex-col gap-1">
+                        <div className="flex items-center gap-1.5 text-[8px] font-black text-on-surface-variant uppercase tracking-widest">
+                          <Laptop className="w-3 h-3 text-primary-container" />
+                          REMOTE_RATIO
+                        </div>
+                        <div className="text-sm font-black text-primary-container tabular-nums">
+                          {selectedJob.Remote_Work_Ratio_Percent}%
+                        </div>
                       </div>
-                      <div className="flex justify-between border-b border-outline-variant/10 pb-1">
-                        <span>DIVERSITY:</span> 
-                        <span className="text-primary-container font-bold">{selectedJob.Gender_Diversity_Percent}%</span>
+
+                      <div className="bg-surface-container-low border border-outline-variant/20 p-2.5 flex flex-col gap-1">
+                        <div className="flex items-center gap-1.5 text-[8px] font-black text-on-surface-variant uppercase tracking-widest">
+                          <Users className="w-3 h-3 text-primary-container" />
+                          DIVERSITY
+                        </div>
+                        <div className="text-sm font-black text-primary-container tabular-nums">
+                          {selectedJob.Gender_Diversity_Percent}%
+                        </div>
                       </div>
-                    </div>
-                    <div className="text-[10px] font-black text-primary-container uppercase mt-2 text-right">
-                      LOC: {selectedJob.Location}
                     </div>
                   </div>
                 </div>
@@ -692,7 +752,7 @@ export default function App() {
         </div>
 
         {/* System Logs Footer */}
-        <footer className="bg-surface-container-low p-4 border-t-2 border-outline-variant/40 font-mono text-[11px] overflow-hidden shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] h-24 lg:h-32 flex-shrink-0">
+        <footer className="bg-surface-container-low p-4 border-t-2 border-outline-variant/40 font-mono text-[11px] overflow-hidden shadow-[inset_0_2px_10px_rgba(0,0,0,0.5)] h-[214px] flex-shrink-0 flex flex-col">
           <div className="flex justify-between items-center mb-2 px-2 border-b border-outline-variant/20 pb-1">
             <span className="text-primary-container font-black uppercase tracking-widest flex items-center gap-2">
               <Terminal className="w-3 h-3" />
@@ -700,7 +760,7 @@ export default function App() {
             </span>
             <span className="text-on-surface-variant uppercase text-[9px]">ID: 0x9928AF_B // LAST_SEEN_SUNLIGHT: 2029-05-12</span>
           </div>
-          <div className="space-y-1 h-16 lg:h-32 overflow-y-auto text-on-surface-variant font-medium custom-scrollbar pr-2">
+          <div className="space-y-1 flex-1 min-h-0 overflow-y-auto text-on-surface-variant font-medium custom-scrollbar pr-2">
             {logs.map((log, i) => (
               <div key={i} className="flex gap-4 hover:bg-white/5 transition-colors">
                 <span className="text-outline-variant">[{log.timestamp}]</span>
@@ -887,7 +947,7 @@ function RiskMatrix({ matches, selectedJob, onSelectJob, isScanning }: {
       .attr('height', 8);
 
     const allNodes = nodesEnter.merge(nodes as any);
-    
+
     allNodes.select('rect')
       .attr('x', d => x(getPlotX(d)) - 4)
       .attr('y', d => y(getPlotY(d)) - 4)
@@ -963,11 +1023,11 @@ function RiskMatrix({ matches, selectedJob, onSelectJob, isScanning }: {
         .attr('y', tooltipY)
         .attr('width', tooltipW)
         .attr('height', tooltipH)
-        .attr('fill', '#1C1B1B')
-        .attr('stroke', '#39FF14')
+        .attr('fill', '#39FF14')
+        .attr('stroke', '#79FF5B')
         .attr('stroke-width', 1)
-        .attr('stroke-opacity', 0.5)
-        .attr('filter', 'drop-shadow(0 0 8px rgba(57, 255, 20, 0.25))');
+        .attr('stroke-opacity', 0.9)
+        .attr('filter', 'drop-shadow(0 0 8px rgba(57, 255, 20, 0.35))');
 
       // Arrow (triangle pointing toward the node)
       const arrowPoints = wouldClipTop
@@ -976,10 +1036,10 @@ function RiskMatrix({ matches, selectedJob, onSelectJob, isScanning }: {
 
       selectionGroup.append('polygon')
         .attr('points', arrowPoints)
-        .attr('fill', '#1C1B1B')
-        .attr('stroke', '#39FF14')
+        .attr('fill', '#39FF14')
+        .attr('stroke', '#79FF5B')
         .attr('stroke-width', 1)
-        .attr('stroke-opacity', 0.5)
+        .attr('stroke-opacity', 0.9)
         .attr('stroke-linejoin', 'round');
 
       // Label text
@@ -990,7 +1050,7 @@ function RiskMatrix({ matches, selectedJob, onSelectJob, isScanning }: {
         .attr('font-family', 'Space Grotesk, monospace')
         .attr('font-weight', '700')
         .attr('letter-spacing', '1')
-        .attr('fill', '#39FF14')
+        .attr('fill', '#053900')
         .text(label);
     }
 
