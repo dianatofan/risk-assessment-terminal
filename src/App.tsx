@@ -792,11 +792,16 @@ export default function App() {
 
 function InfoTooltip({ text }: { text: string }) {
   return (
-    <span className="relative group inline-flex items-center ml-1">
-      <Info className="w-3 h-3 text-on-surface-variant/50 cursor-help group-hover:text-primary-container transition-colors" />
-      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 px-3 py-2 bg-surface-container-highest border border-outline-variant/40 text-[9px] font-mono text-on-surface-variant normal-case tracking-normal leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-50 shadow-lg whitespace-normal">
-        {text}
-        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-outline-variant/40" />
+    <span className="relative group inline-flex items-center ml-1.5">
+      <Info className="w-3 h-3 text-outline-variant cursor-help group-hover:text-primary-container transition-colors duration-150" />
+      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 w-56 z-50 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+        {/* Panel */}
+        <span className="block px-3 py-2.5 bg-surface-container-low border border-primary-container/30 shadow-[0_0_12px_rgba(57,255,20,0.08)] whitespace-normal">
+          <span className="block text-[8px] font-black text-primary-container uppercase tracking-widest mb-1">&gt; INFO</span>
+          <span className="block text-[9px] font-mono text-on-surface-variant leading-relaxed">{text}</span>
+        </span>
+        {/* Arrow */}
+        <span className="block w-0 h-0 mx-auto border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-primary-container/30" />
       </span>
     </span>
   );
