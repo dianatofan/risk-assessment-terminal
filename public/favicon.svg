@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Terminal favicon">
+  <rect width="64" height="64" rx="10" fill="#0E0E0E"/>
+  <rect x="8" y="8" width="48" height="48" rx="6" fill="#1C1B1B" stroke="#3C4B35"/>
+  <path d="M20 27l9 7-9 7" fill="none" stroke="#39FF14" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="34" y="38" width="11" height="4" rx="2" fill="#39FF14"/>
+</svg>
+
